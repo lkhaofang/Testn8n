@@ -1,0 +1,337 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        64,
+        0
+      ],
+      "id": "6ec65b3b-56ff-4316-9fcc-17dff18a2f74",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "330ed528-8d71-4d07-b1b8-1bbca014b83c",
+              "name": "symbol",
+              "value": "CPALL.BK",
+              "type": "string"
+            },
+            {
+              "id": "10f75907-24e7-4064-95b5-a58817db165b",
+              "name": "symbol",
+              "value": "PTT.BK",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        0
+      ],
+      "id": "1c9d7f5e-8c34-4e95-a779-eb03db42f3ff",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://developer.settrade.com/open-api/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1712,
+        448
+      ],
+      "id": "5092e3d2-4598-4225-b629-b463f2b2ddc5",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const HEADERS = {\n  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',\n  'Accept': 'application/json, text/plain, */*',\n  'Accept-Language': 'en-US,en;q=0.9,th;q=0.8',\n  'Connection': 'keep-alive',\n  'Referer': 'https://www.settrade.com/th/home',\n  'sec-ch-ua': '\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"91\", \"Google Chrome\";v=\"91\"',\n  'sec-ch-ua-mobile': '?0',\n  'Sec-Fetch-Dest': 'empty',\n  'Sec-Fetch-Mode': 'cors',\n  'Sec-Fetch-Site': 'same-origin'\n};\n\nconst THRESHOLD = 10;\n\nasync function fetchStocks(url) {\n  const response = await fetch(url, { headers: HEADERS });\n  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);\n  return response.json();\n}\n\nasync function main() {\n  const endpoints = {\n    gainers: 'https://www.settrade.com/api/set/market-summary/realtime/gainers',\n    losers: 'https://www.settrade.com/api/set/market-summary/realtime/losers',\n  };\n\n  let alerts = [];\n\n  for (const [category, url] of Object.entries(endpoints)) {\n    try {\n      const stocks = await fetchStocks(url);\n\n      if (!Array.isArray(stocks)) {\n        console.warn(`ข้อมูลจาก ${url} ไม่ใช่ array`);\n        continue;\n      }\n\n      for (const stock of stocks) {\n        const symbol = stock.symbol;\n        const changePercent = stock.changePercent;\n\n        if (symbol && changePercent !== undefined && Math.abs(changePercent) >= THRESHOLD) {\n          const direction = changePercent > 0 ? 'เพิ่มขึ้น' : 'ลดลง';\n          alerts.push({\n            json: {\n              symbol,\n              direction,\n              changePercent: Math.abs(changePercent).toFixed(2),\n              message: `หุ้น ${symbol} ${direction} ${Math.abs(changePercent).toFixed(2)}%`\n            }\n          });\n        }\n      }\n    } catch (err) {\n      alerts.push({\n        json: {\n          error: `เกิดข้อผิดพลาดในการดึงข้อมูลจาก ${url}: ${err.message}`\n        }\n      });\n    }\n  }\n\n  if (alerts.length === 0) {\n    alerts.push({\n      json: { message: 'ไม่มีหุ้นที่มีการเปลี่ยนแปลงราคามากกว่า 10% ในช่วงนี้' }\n    });\n  }\n\n  return alerts;\n}\n\nreturn main();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "72d2e9c5-399b-4b90-a1b3-436fc7c42637",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=ช่วยดึงข้อมูลข่าวสารจากเว็บไซต์ https://www.settrade.com/th/home โดยเน้นข้อมูลเกี่ยวกับความผันผวนของราคาหุ้นในตลาดหลักทรัพย์\n\n1. ให้ตรวจสอบราคาหุ้นที่มีการเปลี่ยนแปลงอย่างมีนัยสำคัญในช่วงเวลาปัจจุบัน (เช่น ราคาขึ้นหรือลงมากกว่า 10%)\n2. สรุปความเคลื่อนไหวของราคาว่าขึ้นหรือลง พร้อมระบุเปอร์เซ็นต์การเปลี่ยนแปลง\n3. แจ้งเตือนข้อความที่สั้นและเข้าใจง่าย เช่น\n   - \"ราคาหุ้น ABC ปรับตัวขึ้น 3.5% ในวันนี้\"\n   - \"ราคาหุ้น XYZ ปรับตัวลง 2.8% ในวันนี้\"\n4. หากไม่มีการเปลี่ยนแปลงที่น่าสนใจ ให้แจ้งว่า \"ไม่มีความผันผวนราคาหุ้นที่สำคัญในวันนี้\"\n\nโปรดใช้ข้อมูลที่อัพเดตล่าสุดจากหน้าเว็บ และจัดส่งการแจ้งเตือนนี้ทุกวันในช่วงเวลาที่กำหนด\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        496,
+        0
+      ],
+      "id": "30b99c50-bfca-4f50-aa01-9eed47277055",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        496,
+        208
+      ],
+      "id": "999c3e32-3e34-4026-9d23-c87d1410ecbc",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "h1aMe8rCPcXLzqjw",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        304
+      ],
+      "id": "9bc32ac4-de93-4c29-879d-825cb68e2edf",
+      "name": "Send a text message",
+      "webhookId": "a1a6d252-389f-44ef-bd3b-66c91b9467a2",
+      "credentials": {
+        "telegramApi": {
+          "id": "Dsxznfp9vzdM1nM1",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "167f64f7-f68f-4499-81bd-de920ce8ffb8",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "ChangePercent>=5%",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "47020ff2-2cc9-4fc5-832c-c591496f8680",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "ChangePercent>=10%",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "bc088ae8-8888-4e17-a4d9-451ad495c80b",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "ChangePercent>=15%",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "2cd3202d-bb47-4854-a78b-704689aba536",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "ChangePercent>=20%",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "f26ce4dc-f03e-4106-a602-181af69b17cc",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "66010915682@msu.ac.th",
+        "subject": "แจ้งเตือนเรื่องการผันผวนของราคาหุ้น",
+        "message": "แชทบอทจากข้าวฟ่างคนสวย",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        -112
+      ],
+      "id": "f3d47604-018a-4824-ae6a-281009695b93",
+      "name": "Send a message",
+      "webhookId": "dbf57044-e1c9-4832-ae3b-dd1ebeca445d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Q0nv5p7A6onHQfNO",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "66010915682@msu.ac.th",
+        "subject": "แจ้งเตือนเรื่องการผันผวนของราคาหุ้น",
+        "message": "แชทบอทจากข้าวฟ่างคนสวย",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        144
+      ],
+      "id": "0fa1f3f8-9b7c-4d25-b99d-2539381cd42f",
+      "name": "Send a message1",
+      "webhookId": "dbf57044-e1c9-4832-ae3b-dd1ebeca445d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Q0nv5p7A6onHQfNO",
+          "name": "Gmail account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        []
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3f5802c3-c770-4839-906e-beedd11a66ba",
+  "meta": {
+    "instanceId": "8e6e48291ce6c3a4b246d530a6208f84e3eac7036300788daeb0b7733e31ec67"
+  },
+  "id": "nGWMu4BxAef5q4iy",
+  "tags": []
+}
